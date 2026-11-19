@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#163b32"><title>Driver Accounts</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f4f6f5;color:#17231f;font:15px Arial,sans-serif}
+header{background:#163b32;color:white;padding:20px 16px 18px;text-align:center}
+h1{font-size:22px;margin:0 0 14px}.earn{background:#245b4d;border-radius:14px;padding:15px}
+.earn small{display:block;letter-spacing:1px;font-weight:bold}.amount{font-size:30px;font-weight:700;margin:8px}
+main{padding:14px;max-width:700px;margin:auto}.section{font-weight:700;margin:18px 2px 9px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.tile,.panel{background:white;border:1px solid #dce5e0;border-radius:12px;padding:12px}
+.tile h3{margin:0 0 10px;font-size:16px;color:#163b32}.field{margin:8px 0}.field label{display:block;font-size:12px;color:#59665f;margin-bottom:4px}
+input{width:100%;padding:10px;border:1px solid #ccd8d1;border-radius:8px;font-size:16px;background:#fff}
+button{border:0;border-radius:9px;padding:12px 15px;background:#163b32;color:white;font-weight:700;font-size:14px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}.secondary{background:#e1ebe6;color:#163b32}
+table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:8px 5px;border-bottom:1px solid #e4eae6;text-align:left}
+.muted{color:#68766e;font-size:12px}.entry{margin:8px 0}.entry input{margin-top:5px}
+@media(max-width:380px){.grid{grid-template-columns:1fr}}
+
+#login{position:fixed;inset:0;background:#163b32;z-index:20;display:flex;align-items:center;justify-content:center;padding:20px}
+#login .panel{width:100%;max-width:360px}#login h2{margin-top:0;color:#163b32}
+button.small{padding:7px 10px;font-size:12px;margin:3px}.danger{background:#a83232;color:white}
+.record-actions{margin-top:7px}.toolbar{display:flex;gap:7px;flex-wrap:wrap}
+@media print{body{background:white}header{padding:8px}main{max-width:none;padding:8px}.no-print,#login{display:none!important}.panel,.tile{break-inside:avoid}#report{font-size:11px}table{font-size:10px}}
+</style></head><body>
+<div id="login"><div class="panel"><h2>Driver Accounts Login</h2><div class="field"><label>Username</label><input id="loginUser" autocomplete="username"></div><div class="field"><label>PIN / Password</label><input id="loginPin" type="password" inputmode="numeric" autocomplete="current-password"></div><button onclick="loginNow()">Login</button><p id="loginError" class="muted"></p></div></div>
+<header><h1>Driver Accounts</h1><div class="earn"><small>TODAY'S DAILY EARNINGS</small><div class="amount" id="daily">AED 0.00</div><small>Credit + For Us + OWN Trip</small></div></header>
+<main>
+<div class="section">Daily Entry</div>
+<div class="panel entry"><label>Date</label><input id="date" type="date"></div>
+<div class="section">Ride Apps</div><div class="grid" id="apps"></div>
+<div class="section">Other Entries</div><div class="grid" id="other"></div>
+<div class="actions"><button onclick="saveDay()">Save Daily Entry</button><button class="secondary" onclick="clearForm()">Clear Form</button></div>
+<div class="section no-print">PDF Reports & Settings</div><div class="panel no-print">
+<div class="toolbar"><button onclick="dailyPDF()">Daily PDF</button><button onclick="monthlyPDF()">Monthly PDF (One Page)</button><button class="secondary" onclick="backupData()">Backup</button><button class="secondary" onclick="document.getElementById('restoreFile').click()">Restore</button><input id="restoreFile" type="file" accept="application/json,.json" hidden onchange="restoreData(event)"><button class="secondary" onclick="changeLogin()">Change Login</button></div>
+<p class="muted">PDF खोलकर Android के Print / Save as PDF से सेव करें और WhatsApp में भेजें। Backup JSON फ़ाइल है।</p>
+</div>
+<div class="section">Reports</div><div class="panel">
+<div class="field"><label>Month</label><input id="month" type="month"></div>
+<div class="actions"><button onclick="showReport()">Monthly Report</button></div>
+<div id="report" class="muted">Saved daily entries and monthly totals will appear here.</div>
+</div>
+<div class="section no-print">Previous Records</div><div class="panel"><div id="history" class="muted">No saved entries yet.</div></div>
+<p class="muted no-print">Data is saved on this phone. नियमित रूप से Backup रखें।</p>
+</main>
+<script>
+const appNames=['Uber','Yango','Bolt'];
+const otherNames=['OWN Trip','Salik Toll','Car Expenses','EV Charging','Uzair Collected'];
+const fields=['credit','cash','forus'];
+const apps=document.getElementById('apps');
+appNames.forEach(n=>{let id=n.toLowerCase(),el=document.createElement('div');el.className='tile';el.innerHTML='<h3>'+n+'</h3>'+fields.map(f=>'<div class="field"><label>'+({credit:'Credit',cash:'Cash',forus:'For Us'}[f])+'</label><input inputmode="decimal" type="number" step="0.01" min="0" id="'+id+'_'+f+'" placeholder="0.00"></div>').join('');apps.appendChild(el)});
+const other=document.getElementById('other');
+otherNames.forEach((n,i)=>{let el=document.createElement('div');el.className='tile';el.innerHTML='<h3>'+n+'</h3><div class="field"><label>Amount (AED)</label><input inputmode="decimal" type="number" min="0" step="0.01" id="other_'+i+'" placeholder="0.00"></div>';other.appendChild(el)});
+const today=new Date(),iso=d=>new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
+document.getElementById('date').value=iso(today);document.getElementById('month').value=iso(today).slice(0,7);
+function val(id){return Number(document.getElementById(id).value)||0}function money(n){return 'AED '+Number(n||0).toFixed(2)}
+function total(){return ['uber','yango','bolt'].reduce((s,a)=>s+val(a+'_credit')+val(a+'_forus'),0)+val('other_0')}
+function update(){document.getElementById('daily').textContent=money(total())}document.addEventListener('input',update);
+function getData(){let d={date:document.getElementById('date').value,apps:{},other:{}};appNames.forEach(n=>{let a=n.toLowerCase();d.apps[n]={credit:val(a+'_credit'),cash:val(a+'_cash'),forus:val(a+'_forus')}});otherNames.forEach((n,i)=>d.other[n]=val('other_'+i));d.total=total();return d}
+function read(){try{return JSON.parse(localStorage.getItem('driver_entries')||'[]')}catch(e){return []}}
+let editingDate=null;
+function saveDay(){let d=getData();if(!d.date){alert('Please select a date');return}let all=read();if(editingDate){all=all.filter(x=>x.date!==editingDate&&x.date!==d.date);editingDate=null}else{all=all.filter(x=>x.date!==d.date)}all.push(d);all.sort((a,b)=>a.date.localeCompare(b.date));localStorage.setItem('driver_entries',JSON.stringify(all));renderHistory();showReport();alert('Daily entry saved.');}
+function clearForm(){document.querySelectorAll('input[type=number]').forEach(x=>x.value='');editingDate=null;update()}
+function editEntry(date){let d=read().find(x=>x.date===date);if(!d)return;editingDate=date;document.getElementById('date').value=d.date;appNames.forEach(n=>{let a=d.apps?.[n]||{};['credit','cash','forus'].forEach(f=>document.getElementById(n.toLowerCase()+'_'+f).value=a[f]||'')});otherNames.forEach((n,i)=>document.getElementById('other_'+i).value=d.other?.[n]||'');update();window.scrollTo({top:0,behavior:'smooth'});alert('Entry edit mode: changes करके Save Daily Entry दबाएँ।');}
+function deleteEntry(date){if(!confirm(date+' की entry हमेशा के लिए delete करें?'))return;localStorage.setItem('driver_entries',JSON.stringify(read().filter(x=>x.date!==date)));renderHistory();showReport();}
+function renderHistory(){let a=read().slice().reverse();document.getElementById('history').innerHTML=a.length?a.map(x=>'<div style="padding:9px 0;border-bottom:1px solid #eee"><b>'+x.date+'</b> — '+money(x.total)+'<div class="record-actions no-print"><button class="small secondary" onclick="editEntry(\''+x.date+'\')">Edit</button><button class="small danger" onclick="deleteEntry(\''+x.date+'\')">Delete</button></div></div>').join(''):'No saved entries yet.'}
+function reportHTML(m){let rows=read().filter(x=>x.date.startsWith(m)),sum=k=>rows.reduce((s,x)=>s+(x.other?.[k]||0),0);let credit=rows.reduce((s,x)=>s+Object.values(x.apps||{}).reduce((t,a)=>t+(a.credit||0),0),0),forus=rows.reduce((s,x)=>s+Object.values(x.apps||{}).reduce((t,a)=>t+(a.forus||0),0),0),cash=rows.reduce((s,x)=>s+Object.values(x.apps||{}).reduce((t,a)=>t+(a.cash||0),0),0),daily=rows.reduce((s,x)=>s+(x.total||0),0);
+return '<h2>Driver Accounts — '+m+'</h2><p>'+rows.length+' saved days</p><table><tr><td>Daily Earnings Total</td><th>'+money(daily)+'</th></tr><tr><td>Credit Total</td><th>'+money(credit)+'</th></tr><tr><td>For Us Total</td><th>'+money(forus)+'</th></tr><tr><td>Cash Collected (separate)</td><th>'+money(cash)+'</th></tr>'+[['OWN Trip','OWN Trip'],['Salik Toll','Salik Toll'],['Car Expenses','Car Expenses'],['EV Charging','EV Charging'],['Uzair Collected','Uzair Collected']].map(r=>'<tr><td>'+r[0]+'</td><th>'+money(sum(r[1]))+'</th></tr>').join('')+'</table><h3>Daily Details</h3><table><tr><th>Date</th><th>Total</th></tr>'+rows.map(x=>'<tr><td>'+x.date+'</td><td>'+money(x.total)+'</td></tr>').join('')+'</table>'}
+function showReport(){let m=document.getElementById('month').value;if(m)document.getElementById('report').innerHTML=reportHTML(m)}
+function printReport(title,html){let w=window.open('','_blank');if(!w){alert('Pop-up allow करें, फिर PDF दोबारा दबाएँ।');return}w.document.write('<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+title+'</title><style>body{font:14px Arial;padding:18px;color:#17231f}h2{color:#163b32}table{width:100%;border-collapse:collapse}td,th{border:1px solid #bbb;padding:7px;text-align:left}@page{size:A4;margin:10mm}</style></head><body>'+html+'<script>window.onload=function(){setTimeout(function(){window.print()},300)}<\/script></body></html>');w.document.close()}
+function dailyPDF(){let d=read().find(x=>x.date===document.getElementById('date').value)||getData();let rows=appNames.map(n=>'<tr><td>'+n+'</td><td>'+money(d.apps?.[n]?.credit)+'</td><td>'+money(d.apps?.[n]?.cash)+'</td><td>'+money(d.apps?.[n]?.forus)+'</td></tr>').join('');let other=otherNames.map(n=>'<tr><td>'+n+'</td><td colspan="3">'+money(d.other?.[n])+'</td></tr>').join('');printReport('Daily '+d.date,'<h2>Daily Account — '+d.date+'</h2><table><tr><th>App</th><th>Credit</th><th>Cash</th><th>For Us</th></tr>'+rows+other+'</table><h3>Daily Earnings: '+money(d.total)+'</h3>')}
+function monthlyPDF(){let m=document.getElementById('month').value;if(!m){alert('Month select करें');return}printReport('Monthly '+m,'<style>@page{size:A4 landscape;margin:8mm}body{font-size:9px}h2{font-size:16px;margin:0 0 5px}h3{font-size:12px;margin:6px 0 3px}table{font-size:8px}td,th{padding:3px}</style>'+reportHTML(m))}
+function backupData(){let payload={app:'Driver Accounts',version:1,entries:read(),login:JSON.parse(localStorage.getItem('driver_login')||'{"user":"BILAL","pin":"8484"}')};let blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='DriverAccounts_Backup_'+iso(new Date())+'.json';a.click();URL.revokeObjectURL(a.href)}
+function restoreData(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{let o=JSON.parse(r.result),entries=Array.isArray(o)?o:o.entries;if(!Array.isArray(entries))throw Error();if(!confirm('Backup restore करने से मौजूदा entries replace होंगी। जारी रखें?'))return;localStorage.setItem('driver_entries',JSON.stringify(entries));if(o.login)localStorage.setItem('driver_login',JSON.stringify(o.login));renderHistory();showReport();alert('Backup restored.')}catch(_){alert('यह सही Driver Accounts backup file नहीं है।')}e.target.value=''};r.readAsText(f)}
+function getLogin(){try{return JSON.parse(localStorage.getItem('driver_login')||'null')||{user:'BILAL',pin:'8484'}}catch(e){return {user:'BILAL',pin:'8484'}}}
+function loginNow(){let c=getLogin();if(document.getElementById('loginUser').value.trim().toUpperCase()===c.user.toUpperCase()&&document.getElementById('loginPin').value===c.pin){document.getElementById('login').style.display='none';sessionStorage.setItem('driver_logged','1')}else document.getElementById('loginError').textContent='Username या PIN गलत है।'}
+function changeLogin(){let old=getLogin(),u=prompt('नया Username',old.user);if(u===null||!u.trim())return;let pin=prompt('नया PIN / Password');if(pin===null||!pin.trim())return;localStorage.setItem('driver_login',JSON.stringify({user:u.trim(),pin:pin.trim()}));alert('Login details बदल गए। Backup में भी इन्हें सुरक्षित रखें।')}
+if(sessionStorage.getItem('driver_logged')==='1')document.getElementById('login').style.display='none';
+renderHistory();update();showReport();
+</script>
+</body></html>
